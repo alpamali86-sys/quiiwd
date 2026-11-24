@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="kk">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Quizzy — интерактивті викторина</title>
+<script src="/socket.io/socket.io.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
+<style>
+:root{font-family:Inter,system-ui,Arial,sans-serif;color:#f8fafc;background:#0b1020}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(circle at 15% 10%,#26346a 0,transparent 35%),radial-gradient(circle at 90% 80%,#44235d 0,transparent 30%),#0b1020}
+main{max-width:850px;margin:auto;padding:28px 18px}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:28px}.brand{font-size:24px;font-weight:900;letter-spacing:-1px}.brand span{color:#9b8cff}
+.panel{background:#151d34;border:1px solid #2b3656;border-radius:24px;padding:26px;box-shadow:0 18px 60px #0005}
+h1{font-size:clamp(28px,5vw,46px);margin:8px 0 12px;letter-spacing:-1.5px}p{color:#b7c1d9;line-height:1.55}.muted{color:#93a1bf;font-size:14px}
+button,input{font:inherit;border-radius:13px;padding:14px 17px;border:0}button{background:#8b7cff;color:white;font-weight:800;cursor:pointer;margin:6px 5px 0 0}button:hover{filter:brightness(1.1)}button:disabled{opacity:.45;cursor:not-allowed}
+input{background:#0d1428;color:white;border:1px solid #354264;width:100%;margin:8px 0 12px}
+.hidden{display:none!important}.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}
+.option{background:#28375e;text-align:left;width:100%;min-height:75px;font-size:17px}.option:nth-child(2){background:#693f80}.option:nth-child(3){background:#246e78}.option:nth-child(4){background:#87502c}
+#qr{background:white;padding:12px;border-radius:16px;width:220px;height:220px}.center{text-align:center}.code{font-size:40px;font-weight:900;letter-spacing:5px}.players{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0}.chip{background:#263453;border-radius:99px;padding:8px 13px}.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.row>*{flex:1}.status{margin:16px 0;padding:12px;background:#0d1428;border-radius:12px;color:#c9d2e8}
+@media(max-width:560px){.grid{grid-template-columns:1fr}.panel{padding:20px}.top{margin-bottom:18px}}
+</style></head>
+<body><main>
+<div class="top"><div class="brand">QUIZ<span>ZY</span></div><div class="muted">Қарым-қатынас тақырыбы · 15 сұрақ</div></div>
+<section id="home" class="panel">
+<div class="muted">MULTIPLAYER QUIZ</div><h1>Білімінді тексер!</h1><p>Ойынға QR-код арқылы қосыл немесе өз ойыныңды баста.</p>
+<button onclick="createRoom()">Ойынды бастау</button>
+<button onclick="showJoin()" style="background:#344363">Ойынға қосылу</button>
+<div id="joinBox" class="hidden"><input id="joinCode" placeholder="Бөлме коды"><input id="nickname" placeholder="Сенің атың"><button onclick="joinRoom()">Қосылу</button></div>
+<div id="homeError" class="muted"></div>
+</section>
+<section id="host" class="panel hidden center">
+<div class="muted">HOST LOBBY</div><h1>Ойынға қосылыңдар</h1><div class="code" id="roomCode"></div>
+<canvas id="qr"></canvas><p>QR-кодты сканерлеңдер немесе сілтемені ашыңдар:</p><p id="joinUrl" style="word-break:break-all"></p>
+<div class="status"><b id="playerCount">0</b> қатысушы</div><div id="hostPlayers" class="players"></div>
+<button onclick="startGame()">Викторинаны бастау</button>
+<div id="hostGame" class="hidden"><h1 id="hostQuestion"></h1><div class="muted" id="hostProgress"></div><div class="status" id="answerCount">Жауаптар күтілуде...</div><button onclick="reveal()">Дұрыс жауапты көрсету</button><button onclick="nextQuestion()">Келесі сұрақ</button></div>
+</section>
+<section id="player" class="panel hidden">
+<div class="muted">PLAYER</div><h1 id="playerTitle">Сен ойынға қосылдың!</h1><div id="playerContent"><p>Жүргізуші ойынды бастағанша күте тұр.</p></div>
+</section>
+<section id="result" class="panel hidden"><div class="muted">НӘТИЖЕ</div><h1>Ойын аяқталды!</h1><div id="finalBoard"></div><button onclick="location.href='/'">Басты бет</button></section>
+</main>
+<script>
+const socket=io();let code="",isHost=false,chosen=false,questionIndex=0;
+function show(id){["home","host","player","result"].forEach(x=>document.getElementById(x).classList.toggle("hidden",x!==id))}
+function showJoin(){document.getElementById("joinBox").classList.remove("hidden")}
+function createRoom(){socket.emit("host:create",{},res=>{code=res.code;isHost=true;show("host");document.getElementById("roomCode").textContent=code;const url=location.origin+"/?room="+code;document.getElementById("joinUrl").textContent=url;QRCode.toCanvas(document.getElementById("qr"),url,{width:220,margin:1});history.replaceState(null,"","/?host="+code)})}
+function joinRoom(){const c=document.getElementById("joinCode").value.trim().toUpperCase(),n=document.getElementById("nickname").value.trim();socket.emit("player:join",{code:c,name:n},res=>{if(!res.ok){document.getElementById("homeError").textContent=res.error;return}code=c;isHost=false;show("player");document.getElementById("playerTitle").textContent="Сәлем, "+res.name+"!";history.replaceState(null,"","/?room="+code)})}
+function startGame(){socket.emit("host:start",{code});document.getElementById("hostGame").classList.remove("hidden")}
+function renderQuestion(q){questionIndex=q.index;chosen=false;if(isHost){document.getElementById("hostQuestion").textContent=q.question;document.getElementById("hostProgress").textContent=`${q.index+1} / ${q.total}`;document.getElementById("answerCount").textContent="Жауаптар күтілуде..."}else{let html=`<div class="muted">СҰРАҚ ${q.index+1} / ${q.total}</div><h2>${q.question}</h2><div class="grid">`;q.options.forEach((o,i)=>html+=`<button class="option" onclick="answer(${i},this)">${["A","B","C","D"][i]}. ${o}</button>`);html+="</div>";document.getElementById("playerContent").innerHTML=html}}
+function answer(i,el){if(chosen)return;chosen=true;socket.emit("player:answer",{code,choice:i});document.querySelectorAll(".option").forEach(b=>b.disabled=true);el.style.outline="3px solid white"}
+function reveal(){socket.emit("host:reveal",{code})}function nextQuestion(){socket.emit("host:next",{code})}
+function board(list){return "<ol>"+list.map(p=>`<li style="padding:8px">${escapeHtml(p.name)} — <b>${p.score}</b> ұпай</li>`).join("")+"</ol>"}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
+socket.on("lobby:update",players=>{document.getElementById("playerCount").textContent=players.length;document.getElementById("hostPlayers").innerHTML=players.map(p=>`<span class="chip">${escapeHtml(p.name)}</span>`).join("")});
+socket.on("game:question",renderQuestion);
+socket.on("host:answercount",x=>{document.getElementById("answerCount").textContent=`Жауап берді: ${x.answered} / ${x.total}`});
+socket.on("player:answerresult",x=>{document.getElementById("playerContent").innerHTML=x.correct?"<h2>Дұрыс! 🎉</h2><p>Келесі сұрақты күте тұр.</p>":"<h2>Бұл жолы дұрыс емес 🙃</h2><p>Келесі сұрақты күте тұр.</p>"});
+socket.on("game:reveal",x=>{if(isHost){document.getElementById("answerCount").innerHTML="Дұрыс жауап: "+["A","B","C","D"][x.correct]+"<br>"+board(x.leaderboard)}else{document.getElementById("playerContent").innerHTML="<h2>Аралық рейтинг</h2>"+board(x.leaderboard)}});
+socket.on("game:finished",list=>{show("result");document.getElementById("finalBoard").innerHTML=board(list)});
+socket.on("room:closed",()=>{if(!isHost){document.getElementById("playerContent").textContent="Жүргізуші ойынды аяқтады."; }});
+const params=new URLSearchParams(location.search);if(params.get("room")){showJoin();document.getElementById("joinCode").value=params.get("room").toUpperCase()}
+</script></body></html>
