@@ -29,7 +29,7 @@ input{background:#0d1428;color:white;border:1px solid #354264;width:100%;margin:
 </section>
 <section id="host" class="panel hidden center">
 <div class="muted">HOST LOBBY</div><h1>Ойынға қосылыңдар</h1><div class="code" id="roomCode"></div>
-<canvas id="qr"></canvas><p>QR-кодты сканерлеңдер немесе сілтемені ашыңдар:</p><p id="joinUrl" style="word-break:break-all"></p>
+<img id="qr" alt="QR Code"><p>QR-кодты сканерлеңдер немесе сілтемені ашыңдар:</p><p id="joinUrl" style="word-break:break-all"></p>
 <div class="status"><b id="playerCount">0</b> қатысушы</div><div id="hostPlayers" class="players"></div>
 <button onclick="startGame()">Викторинаны бастау</button>
 <div id="hostGame" class="hidden"><h1 id="hostQuestion"></h1><div class="muted" id="hostProgress"></div><div class="status" id="answerCount">Жауаптар күтілуде...</div><button onclick="reveal()">Дұрыс жауапты көрсету</button><button onclick="nextQuestion()">Келесі сұрақ</button></div>
@@ -43,7 +43,9 @@ input{background:#0d1428;color:white;border:1px solid #354264;width:100%;margin:
 const socket=io();let code="",isHost=false,chosen=false,questionIndex=0;
 function show(id){["home","host","player","result"].forEach(x=>document.getElementById(x).classList.toggle("hidden",x!==id))}
 function showJoin(){document.getElementById("joinBox").classList.remove("hidden")}
-function createRoom(){socket.emit("host:create",{},res=>{code=res.code;isHost=true;show("host");document.getElementById("roomCode").textContent=code;const url=location.origin+"/?room="+code;document.getElementById("joinUrl").textContent=url;QRCode.toCanvas(document.getElementById("qr"),url,{width:220,margin:1});history.replaceState(null,"","/?host="+code)})}
+function createRoom(){socket.emit("host:create",{},res=>{code=res.code;isHost=true;show("host");document.getElementById("roomCode").textContent=code;const url=location.origin+"/?room="+code;document.getElementById("joinUrl").textContent=url;document.getElementById("qr").src =
+  "https://api.qrserver.com/v1/create-qr-code/?size=220x220&data="
+  + encodeURIComponent(url);history.replaceState(null,"","/?host="+code)})}
 function joinRoom(){const c=document.getElementById("joinCode").value.trim().toUpperCase(),n=document.getElementById("nickname").value.trim();socket.emit("player:join",{code:c,name:n},res=>{if(!res.ok){document.getElementById("homeError").textContent=res.error;return}code=c;isHost=false;show("player");document.getElementById("playerTitle").textContent="Сәлем, "+res.name+"!";history.replaceState(null,"","/?room="+code)})}
 function startGame(){socket.emit("host:start",{code});document.getElementById("hostGame").classList.remove("hidden")}
 function renderQuestion(q){questionIndex=q.index;chosen=false;if(isHost){document.getElementById("hostQuestion").textContent=q.question;document.getElementById("hostProgress").textContent=`${q.index+1} / ${q.total}`;document.getElementById("answerCount").textContent="Жауаптар күтілуде..."}else{let html=`<div class="muted">СҰРАҚ ${q.index+1} / ${q.total}</div><h2>${q.question}</h2><div class="grid">`;q.options.forEach((o,i)=>html+=`<button class="option" onclick="answer(${i},this)">${["A","B","C","D"][i]}. ${o}</button>`);html+="</div>";document.getElementById("playerContent").innerHTML=html}}
